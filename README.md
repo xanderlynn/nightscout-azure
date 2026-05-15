@@ -1,6 +1,6 @@
 # Nightscout on Azure — ARM Templates
 
-Deploy [Nightscout](https://nightscout.github.io/) to Azure App Service using the **free F1 tier** via ARM templates.
+Deploy [Nightscout](https://nightscout.github.io/) to Azure using **100% Azure resources** on the free tier via a single ARM template.
 
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fxanderlynn%2Fnightscout-azure%2Fmain%2Fazuredeploy.json)
 
@@ -12,77 +12,82 @@ Deploy [Nightscout](https://nightscout.github.io/) to Azure App Service using th
 |---|---|---|
 | App Service Plan | F1 (Free, Linux) | $0/month |
 | App Service (Web App) | Linux container | $0/month |
+| Cosmos DB (MongoDB API) | Free tier (1000 RU/s, 25 GB) | $0/month |
 
-> ⚠️ **F1 plan limits**: 60 CPU minutes/day, 1 GB RAM, shared infrastructure. Suitable for personal use. Not recommended for FreeAPS X or OpenAPS closed-loop systems — consider upgrading to D1 Shared ($) for those use cases.
+> ⚠️ **Cosmos DB free tier** is limited to **one per Azure subscription**. If you already have a free tier Cosmos DB account, the deployment will fail — you'll need to remove `"enableFreeTier": true` from the template and accept the standard Cosmos DB pricing (or use a different subscription).
 
-> ⚠️ **No Azure database**: Azure Cosmos DB (MongoDB API) is **not fully compatible** with Nightscout. Use an external MongoDB provider such as [MongoDB Atlas](https://www.mongodb.com/atlas) (free M0 tier available).
+> ⚠️ **Cosmos DB compatibility**: Azure Cosmos DB for MongoDB API has known partial incompatibilities with Nightscout. The template applies the recommended workaround (`socketTimeoutMS=120000`) in the connection string. Most features work; some edge cases may not.
 
----
-
-## Prerequisites
-
-1. **Azure account** — [Create a free account](https://azure.microsoft.com/en-us/free/)
-2. **MongoDB connection string** — [Set up MongoDB Atlas (free)](https://nightscout.github.io/nightscout/database/)
-3. Azure CLI installed locally **or** deploy via GitHub Actions / the "Deploy to Azure" button above
+> ⚠️ **F1 App Service plan** includes 60 CPU minutes/day. Fine for personal CGM use. Not recommended for FreeAPS X or OpenAPS closed-loop users — consider upgrading to D1 Shared ($).
 
 ---
 
-## Quick start: Deploy to Azure button
+## Parameters
 
-1. Click the **Deploy to Azure** button above (update the URL with your GitHub username first)
-2. Fill in the required parameters:
-   - **App Name** — unique lowercase name (becomes `https://<appName>.azurewebsites.net`)
-   - **MongoDB URI** — your Atlas connection string
-   - **API Secret** — at least 12 characters, no spaces
-   - **Display Units** — `mg/dl` or `mmol/L`
-3. Click **Review + create**, then **Create**
-4. Wait ~2 minutes for deployment, then browse to your URL
+| Parameter | Required | Default | Description |
+|---|---|---|---|
+| `appName` | ✅ | — | Globally unique web app name (lowercase, hyphens ok). Becomes `https://<appName>.azurewebsites.net`. Also used to name the Cosmos DB account (`<appName>-db`). |
+| `apiSecret` | ✅ | — | Nightscout password — 12+ characters, no spaces |
+| `displayUnits` | — | `mg/dl` | `mg/dl` or `mmol/L` |
+| `enablePlugins` | — | standard set | Space-separated Nightscout plugin list |
+| `nightscoutDockerImage` | — | `nightscout/cgm-remote-monitor:latest` | Docker image tag |
+| `location` | — | resource group location | Azure region |
+
+The MongoDB connection string is **automatically constructed** from the Cosmos DB account — you don't need to provide it.
+
+---
+
+## Quick deploy — "Deploy to Azure" button
+
+1. Click the **Deploy to Azure** button above
+2. Select or create a **Resource Group**
+3. Fill in `appName` and `apiSecret`
+4. Click **Review + create** → **Create**
+5. Wait ~5 minutes (Cosmos DB provisioning takes a few minutes)
+6. Browse to `https://<appName>.azurewebsites.net`
 
 ---
 
 ## Deploy with Azure CLI
 
 ```bash
-# 1. Login
+# Login
 az login
 
-# 2. Create a resource group
+# Create resource group
 az group create --name nightscout-rg --location eastus
 
-# 3. Deploy (you will be prompted for secure parameters)
+# Deploy — you will be prompted for apiSecret
 az deployment group create \
   --resource-group nightscout-rg \
   --template-file azuredeploy.json \
   --parameters appName=<your-unique-name> \
-               displayUnits=mg/dl \
-               mongodbUri='<your-mongodb-uri>' \
-               apiSecret='<your-api-secret>'
+               apiSecret='<your-secret-12-chars>'
 ```
 
 ---
 
 ## Deploy with GitHub Actions
 
-GitHub Actions can deploy automatically on pushes to `main` or via manual trigger.
+The included workflow deploys on push to `main` or via manual trigger.
 
-### Required secrets (Settings → Secrets and variables → Actions)
+### Secrets required (Settings → Secrets and variables → Actions)
 
 | Secret | Description |
 |---|---|
-| `AZURE_CREDENTIALS` | Service principal JSON from `az ad sp create-for-rbac` (see below) |
-| `MONGODB_URI` | Your MongoDB Atlas connection string |
+| `AZURE_CREDENTIALS` | Service principal JSON (see below) |
 | `NIGHTSCOUT_API_SECRET` | Nightscout API secret (12+ chars) |
 
-### Required variables
+### Variables required
 
 | Variable | Description |
 |---|---|
 | `AZURE_RESOURCE_GROUP` | Resource group name (default: `nightscout-rg`) |
 | `AZURE_LOCATION` | Azure region (default: `eastus`) |
-| `NIGHTSCOUT_APP_NAME` | Your app name (used on push deploys) |
+| `NIGHTSCOUT_APP_NAME` | Your app name |
 | `DISPLAY_UNITS` | `mg/dl` or `mmol/L` |
 
-### Create an Azure service principal
+### Create a service principal
 
 ```bash
 az ad sp create-for-rbac \
@@ -92,47 +97,29 @@ az ad sp create-for-rbac \
   --sdk-auth
 ```
 
-Copy the JSON output into the `AZURE_CREDENTIALS` secret.
-
----
-
-## Parameters reference
-
-| Parameter | Required | Default | Description |
-|---|---|---|---|
-| `appName` | ✅ | — | Globally unique web app name |
-| `mongodbUri` | ✅ | — | MongoDB Atlas connection string |
-| `apiSecret` | ✅ | — | Nightscout password (12+ chars) |
-| `displayUnits` | — | `mg/dl` | `mg/dl` or `mmol/L` |
-| `enablePlugins` | — | standard set | Space-separated plugin list |
-| `nightscoutDockerImage` | — | `nightscout/cgm-remote-monitor:latest` | Docker image tag |
-| `location` | — | resource group location | Azure region |
-
-### Dexcom Share (optional)
-
-To pull CGM data directly from Dexcom Share, add `bridge` to `enablePlugins` and set these app settings manually in the Azure portal after deployment (or extend the template):
-
-- `BRIDGE_USER_NAME` — Dexcom account username
-- `BRIDGE_PASSWORD` — Dexcom account password
-- `BRIDGE_SERVER` — `US` or `EU`
+Paste the JSON output into the `AZURE_CREDENTIALS` secret.
 
 ---
 
 ## After deployment
 
 1. Browse to `https://<appName>.azurewebsites.net`
-2. Complete the initial profile setup
+2. Complete the initial profile setup (timezone, etc.)
 3. Authenticate with your API secret
 4. Review [Nightscout security settings](https://nightscout.github.io/nightscout/security/)
 
----
+### Connect your CGM uploader
 
-## Updating Nightscout
+- **xDrip+** — set Nightscout URL in xDrip sync settings
+- **Dexcom Share bridge** — add these app settings in Azure portal → App Service → Environment Variables:
+  - `BRIDGE_USER_NAME`, `BRIDGE_PASSWORD`, `BRIDGE_SERVER` (US or EU)
+  - Add `bridge` to your `ENABLE` app setting
+- **Loop / AAPS** — configure Nightscout URL + API secret in the app
 
-To pull a newer Nightscout image, restart the App Service in the Azure portal:
+### Updating Nightscout
 
-**App Service → Overview → Restart**
+Restart the App Service to pull the latest image:
 
-Azure will pull the latest `nightscout/cgm-remote-monitor:latest` image on next start.
+**Azure portal → App Service → Overview → Restart**
 
-To pin a specific version, set the `nightscoutDockerImage` parameter to e.g. `nightscout/cgm-remote-monitor:15.0.2`.
+To pin a version: set `nightscoutDockerImage` to e.g. `nightscout/cgm-remote-monitor:15.0.2`.

@@ -15,12 +15,6 @@
         "description": "Azure region for all resources. Defaults to the resource group location."
       }
     },
-    "mongodbUri": {
-      "type": "securestring",
-      "metadata": {
-        "description": "MongoDB connection string (e.g. from MongoDB Atlas). Must start with mongodb+srv:// or mongodb://"
-      }
-    },
     "apiSecret": {
       "type": "securestring",
       "minLength": 12,
@@ -55,9 +49,84 @@
     }
   },
   "variables": {
-    "appServicePlanName": "[concat(parameters('appName'), '-plan')]"
+    "appServicePlanName": "[concat(parameters('appName'), '-plan')]",
+    "cosmosAccountName": "[concat(parameters('appName'), '-db')]",
+    "cosmosDbName": "nightscout",
+    "cosmosCollectionName": "entries",
+    "mongodbUri": "[concat('mongodb://', variables('cosmosAccountName'), ':', listKeys(resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmosAccountName')), '2023-04-15').primaryMasterKey, '@', variables('cosmosAccountName'), '.mongo.cosmos.azure.com:10255/', variables('cosmosDbName'), '?ssl=true&retrywrites=false&maxIdleTimeMS=120000&appName=@', variables('cosmosAccountName'), '@&socketTimeoutMS=120000')]"
   },
   "resources": [
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts",
+      "apiVersion": "2023-04-15",
+      "name": "[variables('cosmosAccountName')]",
+      "location": "[parameters('location')]",
+      "kind": "MongoDB",
+      "properties": {
+        "enableFreeTier": true,
+        "databaseAccountOfferType": "Standard",
+        "apiProperties": {
+          "serverVersion": "4.2"
+        },
+        "capabilities": [
+          { "name": "EnableMongo" },
+          { "name": "DisableRateLimitingResponses" }
+        ],
+        "consistencyPolicy": {
+          "defaultConsistencyLevel": "Session"
+        },
+        "locations": [
+          {
+            "locationName": "[parameters('location')]",
+            "failoverPriority": 0,
+            "isZoneRedundant": false
+          }
+        ],
+        "backupPolicy": {
+          "type": "Continuous",
+          "continuousModeProperties": {
+            "tier": "Continuous7Days"
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/mongodbDatabases",
+      "apiVersion": "2023-04-15",
+      "name": "[concat(variables('cosmosAccountName'), '/', variables('cosmosDbName'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmosAccountName'))]"
+      ],
+      "properties": {
+        "resource": {
+          "id": "[variables('cosmosDbName')]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections",
+      "apiVersion": "2023-04-15",
+      "name": "[concat(variables('cosmosAccountName'), '/', variables('cosmosDbName'), '/', variables('cosmosCollectionName'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/mongodbDatabases', variables('cosmosAccountName'), variables('cosmosDbName'))]"
+      ],
+      "properties": {
+        "resource": {
+          "id": "[variables('cosmosCollectionName')]",
+          "indexes": [
+            {
+              "key": { "keys": [ "_id" ] }
+            },
+            {
+              "key": { "keys": [ "date" ] }
+            },
+            {
+              "key": { "keys": [ "type" ] }
+            }
+          ]
+        }
+      }
+    },
     {
       "type": "Microsoft.Web/serverfarms",
       "apiVersion": "2022-09-01",
@@ -79,7 +148,8 @@
       "location": "[parameters('location')]",
       "kind": "app,linux,container",
       "dependsOn": [
-        "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]"
+        "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmosAccountName'))]"
       ],
       "properties": {
         "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
@@ -91,7 +161,7 @@
           "appSettings": [
             {
               "name": "MONGODB_URI",
-              "value": "[parameters('mongodbUri')]"
+              "value": "[variables('mongodbUri')]"
             },
             {
               "name": "API_SECRET",
@@ -127,9 +197,9 @@
       "type": "string",
       "value": "[concat('https://', parameters('appName'), '.azurewebsites.net')]"
     },
-    "appServicePlanId": {
+    "cosmosDbAccountName": {
       "type": "string",
-      "value": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]"
+      "value": "[variables('cosmosAccountName')]"
     }
   }
 }

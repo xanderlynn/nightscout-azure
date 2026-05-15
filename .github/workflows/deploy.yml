@@ -43,7 +43,6 @@ jobs:
           template: ./azuredeploy.json
           parameters: >
             appName=${{ github.event.inputs.appName || vars.NIGHTSCOUT_APP_NAME }}
-            mongodbUri=${{ secrets.MONGODB_URI }}
             apiSecret=${{ secrets.NIGHTSCOUT_API_SECRET }}
             displayUnits=${{ github.event.inputs.displayUnits || vars.DISPLAY_UNITS || 'mg/dl' }}
 
