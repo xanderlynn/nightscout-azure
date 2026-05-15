@@ -1,0 +1,53 @@
+name: Deploy Nightscout to Azure
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'azuredeploy.json'
+      - 'azuredeploy.parameters.json'
+  workflow_dispatch:
+    inputs:
+      appName:
+        description: 'Azure Web App name (must be globally unique)'
+        required: true
+      displayUnits:
+        description: 'Blood glucose units (mg/dl or mmol/L)'
+        required: true
+        default: 'mg/dl'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Create Resource Group (if not exists)
+        run: |
+          az group create \
+            --name ${{ vars.AZURE_RESOURCE_GROUP || 'nightscout-rg' }} \
+            --location ${{ vars.AZURE_LOCATION || 'eastus' }} \
+            --output none
+
+      - name: Deploy ARM Template
+        uses: azure/arm-deploy@v2
+        with:
+          resourceGroupName: ${{ vars.AZURE_RESOURCE_GROUP || 'nightscout-rg' }}
+          template: ./azuredeploy.json
+          parameters: >
+            appName=${{ github.event.inputs.appName || vars.NIGHTSCOUT_APP_NAME }}
+            mongodbUri=${{ secrets.MONGODB_URI }}
+            apiSecret=${{ secrets.NIGHTSCOUT_API_SECRET }}
+            displayUnits=${{ github.event.inputs.displayUnits || vars.DISPLAY_UNITS || 'mg/dl' }}
+
+      - name: Show Nightscout URL
+        run: |
+          APP_NAME="${{ github.event.inputs.appName || vars.NIGHTSCOUT_APP_NAME }}"
+          echo "✅ Nightscout deployed at: https://${APP_NAME}.azurewebsites.net"

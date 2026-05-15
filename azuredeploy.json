@@ -1,0 +1,135 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "appName": {
+      "type": "string",
+      "metadata": {
+        "description": "Unique name for your Nightscout web app (lowercase letters, numbers, and hyphens only). This will become part of your URL: https://<appName>.azurewebsites.net"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for all resources. Defaults to the resource group location."
+      }
+    },
+    "mongodbUri": {
+      "type": "securestring",
+      "metadata": {
+        "description": "MongoDB connection string (e.g. from MongoDB Atlas). Must start with mongodb+srv:// or mongodb://"
+      }
+    },
+    "apiSecret": {
+      "type": "securestring",
+      "minLength": 12,
+      "metadata": {
+        "description": "Nightscout API secret — at least 12 characters, no spaces. This is the main password for your site."
+      }
+    },
+    "displayUnits": {
+      "type": "string",
+      "defaultValue": "mg/dl",
+      "allowedValues": [
+        "mg/dl",
+        "mmol/L"
+      ],
+      "metadata": {
+        "description": "Blood glucose units displayed in Nightscout."
+      }
+    },
+    "enablePlugins": {
+      "type": "string",
+      "defaultValue": "careportal basal dbsize rawbg iob maker cob bwp cage iage sage boluscalc pushover treatmentnotify loop pump profile food openaps bage alexa override speech cors",
+      "metadata": {
+        "description": "Space-separated list of Nightscout plugins to enable. Add 'bridge' if you use Dexcom Share as a data source."
+      }
+    },
+    "nightscoutDockerImage": {
+      "type": "string",
+      "defaultValue": "nightscout/cgm-remote-monitor:latest",
+      "metadata": {
+        "description": "Docker image for Nightscout. Override to pin a specific version tag."
+      }
+    }
+  },
+  "variables": {
+    "appServicePlanName": "[concat(parameters('appName'), '-plan')]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2022-09-01",
+      "name": "[variables('appServicePlanName')]",
+      "location": "[parameters('location')]",
+      "kind": "linux",
+      "sku": {
+        "name": "F1",
+        "tier": "Free"
+      },
+      "properties": {
+        "reserved": true
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2022-09-01",
+      "name": "[parameters('appName')]",
+      "location": "[parameters('location')]",
+      "kind": "app,linux,container",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]"
+      ],
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+        "httpsOnly": true,
+        "siteConfig": {
+          "linuxFxVersion": "[concat('DOCKER|', parameters('nightscoutDockerImage'))]",
+          "alwaysOn": false,
+          "http20Enabled": true,
+          "appSettings": [
+            {
+              "name": "MONGODB_URI",
+              "value": "[parameters('mongodbUri')]"
+            },
+            {
+              "name": "API_SECRET",
+              "value": "[parameters('apiSecret')]"
+            },
+            {
+              "name": "DISPLAY_UNITS",
+              "value": "[parameters('displayUnits')]"
+            },
+            {
+              "name": "ENABLE",
+              "value": "[parameters('enablePlugins')]"
+            },
+            {
+              "name": "NODE_ENV",
+              "value": "production"
+            },
+            {
+              "name": "WEBSITES_PORT",
+              "value": "1337"
+            },
+            {
+              "name": "DOCKER_REGISTRY_SERVER_URL",
+              "value": "https://index.docker.io"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "nightscoutUrl": {
+      "type": "string",
+      "value": "[concat('https://', parameters('appName'), '.azurewebsites.net')]"
+    },
+    "appServicePlanId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]"
+    }
+  }
+}
