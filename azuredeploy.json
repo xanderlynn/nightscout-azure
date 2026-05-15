@@ -52,8 +52,7 @@
     "appServicePlanName": "[concat(parameters('appName'), '-plan')]",
     "cosmosAccountName": "[concat(parameters('appName'), '-db')]",
     "cosmosDbName": "nightscout",
-    "cosmosCollectionName": "entries",
-    "mongodbUri": "[concat('mongodb://', variables('cosmosAccountName'), ':', listKeys(resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmosAccountName')), '2023-04-15').primaryMasterKey, '@', variables('cosmosAccountName'), '.mongo.cosmos.azure.com:10255/', variables('cosmosDbName'), '?ssl=true&retrywrites=false&maxIdleTimeMS=120000&appName=@', variables('cosmosAccountName'), '@&socketTimeoutMS=120000')]"
+    "cosmosCollectionName": "entries"
   },
   "resources": [
     {
@@ -161,7 +160,7 @@
           "appSettings": [
             {
               "name": "MONGODB_URI",
-              "value": "[variables('mongodbUri')]"
+              "value": "[concat('mongodb://', variables('cosmosAccountName'), ':', listKeys(resourceId('Microsoft.DocumentDB/databaseAccounts', variables('cosmosAccountName')), '2023-04-15').primaryMasterKey, '@', variables('cosmosAccountName'), '.mongo.cosmos.azure.com:10255/nightscout?ssl=true&retrywrites=false&maxIdleTimeMS=120000&appName=@', variables('cosmosAccountName'), '@&socketTimeoutMS=120000')]"
             },
             {
               "name": "API_SECRET",
