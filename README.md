@@ -2,9 +2,7 @@
 
 Deploy [Nightscout](https://nightscout.github.io/) to Azure App Service using the **free F1 tier** via ARM templates.
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FYOUR_ORG%2Fnightscout-azure%2Fmain%2Fazuredeploy.json)
-
-> **Replace `YOUR_ORG`** in the button URL above with your GitHub username or org name after creating the repo.
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fxanderlynn%2Fnightscout-azure%2Fmain%2Fazuredeploy.json)
 
 ---
 
