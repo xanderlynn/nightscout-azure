@@ -135,8 +135,8 @@
       "location": "[parameters('location')]",
       "kind": "linux",
       "sku": {
-        "name": "F1",
-        "tier": "Free"
+        "name": "B1",
+        "tier": "Basic"
       },
       "properties": {
         "reserved": true
@@ -157,7 +157,7 @@
         "httpsOnly": true,
         "siteConfig": {
           "linuxFxVersion": "[concat('DOCKER|', parameters('nightscoutDockerImage'))]",
-          "alwaysOn": false,
+          "alwaysOn": true,
           "http20Enabled": true,
           "appSettings": [
             {
