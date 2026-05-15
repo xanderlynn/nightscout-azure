@@ -82,9 +82,11 @@
           }
         ],
         "backupPolicy": {
-          "type": "Continuous",
-          "continuousModeProperties": {
-            "tier": "Continuous7Days"
+          "type": "Periodic",
+          "periodicModeProperties": {
+            "backupIntervalInMinutes": 240,
+            "backupRetentionIntervalInHours": 8,
+            "backupStorageRedundancy": "Local"
           }
         }
       }
