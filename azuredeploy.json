@@ -62,14 +62,14 @@
       "location": "[parameters('location')]",
       "kind": "MongoDB",
       "properties": {
-        "enableFreeTier": true,
+        "enableFreeTier": false,
         "databaseAccountOfferType": "Standard",
         "apiProperties": {
           "serverVersion": "4.2"
         },
         "capabilities": [
           { "name": "EnableMongo" },
-          { "name": "DisableRateLimitingResponses" }
+          { "name": "EnableServerless" }
         ],
         "consistencyPolicy": {
           "defaultConsistencyLevel": "Session"
